@@ -16,6 +16,6 @@ jobs:
           registry-url: https://npm.pkg.github.com/
           scope: '@RFL-NFTPlatform'
       - run: npm install
-      - run: npm package
+      - run: npm run package
         env:
           NODE_AUTH_TOKEN: ${{secrets.GITHUB_TOKEN}}
