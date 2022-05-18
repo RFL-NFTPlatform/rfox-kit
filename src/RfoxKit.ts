@@ -168,32 +168,30 @@ export default class RfoxKit {
   async maxAmount(): Promise<number> {
     const contractMaxAmount = await this.contract.MAX_NFT();
 
-    return contractMaxAmount.toNumber();
+    return Number(contractMaxAmount);
   }
 
   async maxPerMint(): Promise<number> {
-    const maxTokensPerTransaction: BigNumber =
+    const maxTokensPerTransaction =
       await this.contract.maxTokensPerTransaction();
 
-    return maxTokensPerTransaction.toNumber();
+    return Number(maxTokensPerTransaction);
   }
 
   async maxPerMintPresale(): Promise<number> {
-    const maxTokensPerTransaction: BigNumber =
+    const maxTokensPerTransaction =
       await this.contract.maxMintedPresalePerAddress();
 
-    return maxTokensPerTransaction.toNumber();
+    return Number(maxTokensPerTransaction);
   }
 
   async totalSupply(): Promise<number> {
-    const mintedNfts: BigNumber = await this.contract.totalSupply();
-    return mintedNfts.toNumber();
+    const mintedNfts = await this.contract.totalSupply();
+    return Number(mintedNfts);
   }
 
   async saleActive(): Promise<boolean> {
-    return (
-      (await this.contract.saleStartTime().toNumber()) < Number(new Date())
-    );
+    return Number(await this.contract.saleStartTime()) < Number(new Date());
   }
 
   async publicActive(): Promise<boolean> {
@@ -201,8 +199,7 @@ export default class RfoxKit {
       return true;
     }
     return (
-      (await this.contract.publicSaleStartTime().toNumber()) <
-      Number(new Date())
+      Number(await this.contract.publicSaleStartTime()) < Number(new Date())
     );
   }
 

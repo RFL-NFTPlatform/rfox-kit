@@ -23,6 +23,6 @@ jobs:
       - name: Add Name Scope
         run: npm run addscope
       - name: Publish
-        run: npm publish
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{secrets.GITHUB_TOKEN}}
