@@ -19,6 +19,8 @@ jobs:
         run: npm install
       - name: Build
         run: npm run build
+      - name: Add Name Scope
+        run: npm run addscope
       - name: Publish
         run: npm publish
         env:
