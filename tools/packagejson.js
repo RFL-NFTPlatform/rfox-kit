@@ -20,6 +20,6 @@ fs.writeFile(
     if (err) {
       return console.log(err);
     }
-    console.log('Writing to ' + fileName);
+    console.log("Writing to " + fileName);
   }
 );

@@ -158,6 +158,13 @@ export default class RfoxKit {
     return contractMaxPrice;
   }
 
+  async pricePreSale(): Promise<BigNumber> {
+    const contractMaxPrice: BigNumber =
+      await this.contract.TOKEN_PRICE_PRESALE();
+
+    return contractMaxPrice;
+  }
+
   async maxAmount(): Promise<number> {
     const contractMaxAmount = await this.contract.MAX_NFT();
 
@@ -167,6 +174,13 @@ export default class RfoxKit {
   async maxPerMint(): Promise<number> {
     const maxTokensPerTransaction: BigNumber =
       await this.contract.maxTokensPerTransaction();
+
+    return maxTokensPerTransaction.toNumber();
+  }
+
+  async maxPerMintPresale(): Promise<number> {
+    const maxTokensPerTransaction: BigNumber =
+      await this.contract.maxMintedPresalePerAddress();
 
     return maxTokensPerTransaction.toNumber();
   }
@@ -214,27 +228,33 @@ export default class RfoxKit {
       const saleActive = await this.saleActive();
       const publicActive = await this.publicActive();
 
-      const maxPerWallet = await this.maxPerWallet();
+      const maxPerWallet =
+        saleActive && !publicActive
+          ? await this.maxPerMintPresale()
+          : await this.maxPerMint();
 
       if (quantity > maxPerWallet) {
         throw new Error(
-          `You can't mint more than ${maxPerWallet} tokens on your wallet`
+          `You can't mint more than ${maxPerWallet} tokens in this transactions`
         );
       }
 
-      if (!saleActive && !presaleActive) {
+      if (!saleActive && !publicActive) {
         throw new Error("Collection is not on sale");
       }
 
-      const price = auctionActive
-        ? await this.auctionPrice()
-        : await this.price();
+      const price =
+        saleActive && !publicActive
+          ? await this.pricePreSale()
+          : await this.price();
+
       const amount = price.mul(quantity);
 
       // Presale minting
-      if (presaleActive) {
+      if (saleActive && !publicActive) {
         // Backwards compatibility with v2 contracts:
         // If the public sale is not active, we can still try mint with the presale
+
         return await this._presaleMint(quantity, amount);
       }
 
@@ -250,30 +270,38 @@ export default class RfoxKit {
     quantity: number,
     amount: BigNumber
   ): Promise<ContractReceipt> {
-    const trx: ContractTransaction = await this.contract.mint(quantity, {
-      value: amount,
-    });
+    const trx: ContractTransaction = await this.contract.buyNFTsPublic(
+      quantity,
+      {
+        value: amount,
+      }
+    );
 
     return trx.wait();
   }
 
   private async _presaleMint(
     quantity: number,
-    amount: BigNumber,
-    functionName: string
+    amount: BigNumber
   ): Promise<ContractReceipt> {
     const data = await this.generateProof();
     if (data.message) {
       // Backwards compatibility for v2 contracts
-      if (this.version === 3) {
-        throw new Error(
-          "Collection is not active or your wallet is not part of presale."
-        );
+      if (this.contractType === "standard") {
+        throw new Error("Collection does not support preSale");
       }
       throw new Error("Your wallet is not part of presale.");
     }
 
-    const trx: ContractTransaction = await this.contract.this[functionName](
+    // ContractTransaction = await this.contract.this[functionName](
+    //   quantity,
+    //   data.proof,
+    //   {
+    //     value: amount,
+    //   }
+    // );
+
+    const trx: ContractTransaction = await this.contract.buyNFTsPresale(
       quantity,
       data.proof,
       {
