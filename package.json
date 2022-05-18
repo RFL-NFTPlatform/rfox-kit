@@ -1,6 +1,6 @@
 {
-  "name": "rfox-kit",
-  "version": "1.0.5",
+  "name": "@rfl-nftplatform/rfox-kit",
+  "version": "1.0.6",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "umd:main": "dist/umd/index.js",
@@ -32,11 +32,12 @@
     "ethers",
     "web3modal"
   ],
-  "author": "RfoxKit <hello@rfox.com>",
+  "author": "Rfox <hello@rfox.com>",
   "license": "MIT",
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com/@RFL-NFTPlatform"
+    "registry": "https://npm.pkg.github.com/"
   },
+  "repository": "https://github.com/RFL-NFTPlatform/rfox-kit.git",
   "dependencies": {
     "@ethersproject/abi": "^5.6.2",
     "@nomiclabs/hardhat-ethers": "^2.0.6",
