@@ -1,5 +1,5 @@
 const path = require('path');
-const Dotenv = require('dotenv-webpack');
+// const Dotenv = require('dotenv-webpack');
 
 module.exports = {
   mode: 'production',
@@ -29,5 +29,5 @@ module.exports = {
   resolve: {
     extensions: ['.ts', '.js', '.tsx', '.jsx'],
   },
-  plugins: [new Dotenv()],
+  // plugins: [new Dotenv()],
 };

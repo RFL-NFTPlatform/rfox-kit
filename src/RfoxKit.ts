@@ -12,14 +12,17 @@ import {
 import RFOXErc721StandardABI from "./abis/RFOXERC721Standard.json";
 import RFOXErc721WhitelistABI from "./abis/RFOXERC721Whitelist.json";
 import RFOXErc721BotPreventionABI from "./abis/RFOXERC721BotPrevention.json";
+import RFOXTVABI from "./abis/RFOXTV.json";
+
 import { handleError } from "./errors/utils";
-import { ErrorApiResponse, ProofApiResponse } from "./typings/api-responses";
+import { ErrorApiResponse, ProofApiResponse, RfoxTvProofResponse } from "./typings/api-responses";
 import Web3Modal, { IProviderOptions } from "web3modal";
 import { PROVIDER_OPTIONS } from "./config/providers";
 import {
   JsonRpcProvider,
   JsonRpcSigner,
   Provider,
+  TransactionResponse,
   Web3Provider,
 } from "@ethersproject/providers";
 import { NETWORKS } from "./config/network";
@@ -29,16 +32,26 @@ const abis: Record<string, unknown> = {
   standard: RFOXErc721StandardABI,
   whitelist: RFOXErc721WhitelistABI,
   botprevention: RFOXErc721BotPreventionABI,
+  rfoxtv: RFOXTVABI,
 };
 
 export default class RfoxKit {
-  dev?: boolean;
+  dev: boolean;
   address: string;
   collectionId?: string;
   contract: Contract = {} as Contract;
   walletAddress?: string;
+  walletBalance?: string;
+  assetId?: string;
   contractType: string;
-  maxSupply?: number;
+  maxSupply: number;
+  currentSupply: number;
+  maxPerTx: number;
+  maxPerTxWL: number;
+  salePrice: BigNumber;
+  preSalePrice: BigNumber;
+  isPublicActive: boolean;
+  isSaleActive: boolean;
   provider: Web3Provider | JsonRpcProvider = {} as Web3Provider;
   signer: JsonRpcSigner = {} as JsonRpcSigner;
   ethInstance: any;
@@ -49,32 +62,55 @@ export default class RfoxKit {
     return this.dev ? API_ENDPOINT_DEV : API_ENDPOINT;
   }
 
+
   constructor() {
+    this.dev = false;
     this.address = "";
     this.contractType = "standard";
     this.maxSupply = 0;
+    this.currentSupply = 0;
+    this.isPublicActive = false;
+    this.isSaleActive = false;
+    this.maxPerTx = 0;
+    this.maxPerTxWL = 0;
+    this.salePrice = BigNumber.from(0);
+    this.preSalePrice = BigNumber.from(0);
   }
 
   async init(
+    dev: boolean,
     contractAddress: string,
     collectionId: string,
     contractType: string,
     networkName: string,
     chainId: number,
-    maxSupply: number,
     providerOptions: IProviderOptions,
-    provider?: JsonRpcProvider
+    assetId?: string,
+    provider?: JsonRpcProvider,
   ) {
     if (!contractAddress || !collectionId) {
       throw new Error("Collection is not ready yet.");
     }
 
+    console.log('init param', {
+      dev,
+      contractAddress,
+      collectionId,
+      contractType,
+      networkName,
+      chainId,
+      assetId
+    })
+
+    this.dev = dev;
     this.address = contractAddress;
     this.collectionId = collectionId;
     this.contractType = contractType;
     this.networkName = networkName;
     this.chainId = chainId;
-    this.maxSupply = maxSupply;
+    this.assetId = assetId;
+
+    console.log('assign value', this.assetId)
 
     const abi = abis[this.contractType || "standard"];
 
@@ -105,6 +141,7 @@ export default class RfoxKit {
       }
 
       this.walletAddress = await this.signer.getAddress();
+      this.walletBalance = ethers.utils.formatEther(await this.signer.getBalance())
       signerOrProvider = this.signer;
     }
     if (!this.address) {
@@ -118,33 +155,39 @@ export default class RfoxKit {
     if (!this.contract) {
       throw new Error("Initialization failed.");
     }
-
     return;
   }
 
   static async create(
+    dev: boolean,
     contractAddress: string,
     collectionId: string,
     contractType: string,
     networkName: string,
     chainId: number,
-    maxSupply: number,
     providerOptions?: IProviderOptions,
-    provider?: JsonRpcProvider
+    assetId?:string,
+    provider?: JsonRpcProvider,
   ): Promise<RfoxKit | null> {
     try {
       const rfoxKit = new RfoxKit();
 
       await rfoxKit.init(
+        dev,
         contractAddress,
         collectionId,
         contractType,
         networkName,
         chainId,
-        maxSupply,
         providerOptions || PROVIDER_OPTIONS,
-        provider
+        assetId,
+        provider,
       );
+
+        //get collection details when its standard contract
+      console.log('get collection details', contractType)
+      await rfoxKit.getCollectionDetails(contractType)
+
       return rfoxKit;
     } catch (error) {
       handleError(error as EthereumRpcError<unknown>);
@@ -153,16 +196,22 @@ export default class RfoxKit {
   }
 
   async price(): Promise<BigNumber> {
-    const contractMaxPrice: BigNumber = await this.contract.TOKEN_PRICE();
+    const contractPrice: BigNumber = await this.contract.TOKEN_PRICE();
 
-    return contractMaxPrice;
+    return contractPrice;
+  }
+
+  async priceRfoxTv(): Promise<BigNumber> {
+    const contractPrice: BigNumber = await this.contract.tokenPrice();
+
+    return contractPrice;
   }
 
   async pricePreSale(): Promise<BigNumber> {
-    const contractMaxPrice: BigNumber =
+    const contractPresalePrice: BigNumber =
       await this.contract.TOKEN_PRICE_PRESALE();
 
-    return contractMaxPrice;
+    return contractPresalePrice;
   }
 
   async maxAmount(): Promise<number> {
@@ -179,15 +228,15 @@ export default class RfoxKit {
   }
 
   async maxPerMintPresale(): Promise<number> {
-    const maxTokensPerTransaction =
+    const maxTokensPerTransactionPresale =
       await this.contract.maxMintedPresalePerAddress();
 
-    return Number(maxTokensPerTransaction);
+    return Number(maxTokensPerTransactionPresale);
   }
 
   async totalSupply(): Promise<number> {
-    const mintedNfts = await this.contract.totalSupply();
-    return Number(mintedNfts);
+    const totalSupply = await this.contract.totalSupply();
+    return Number(totalSupply);
   }
 
   async saleActive(): Promise<boolean> {
@@ -201,6 +250,49 @@ export default class RfoxKit {
     return (
       Number(await this.contract.publicSaleStartTime()) < Number(new Date())
     );
+  }
+
+  async getCollectionDetails(contractType: string) {
+    // this.maxMinted = await this.maxAmount();
+    // this.isPublicActive = await this.publicActive();
+    // this.isPresaleActive = await this.saleActive() && !this.isPublicActive;
+    // this.currentMinted = await this.totalSupply();
+
+    if(contractType === 'rfoxtv') {
+      this.maxSupply = 0; //no limit
+      this.currentSupply = 0; //no supply cap for rfox tv
+      this.isSaleActive = true;
+      this.maxPerTx = 1; // for now remain as 1
+
+      this.salePrice = await this.priceRfoxTv();
+    }
+    else {
+      this.maxSupply = await this.maxAmount();
+      this.currentSupply = await this.totalSupply();
+      this.isSaleActive = await this.saleActive();
+      this.maxPerTx = await this.maxPerMint();
+
+      this.salePrice = BigNumber.from(0);
+
+      if(contractType !== 'standard') {
+        this.maxPerTxWL = await this.maxPerMintPresale();
+        this.isPublicActive = await this.publicActive();
+        this.preSalePrice = await this.pricePreSale();
+      }
+
+    }
+
+    return;
+
+  }
+
+  async videoMinted(videoId: string): Promise<boolean> {
+
+    const videoByte = ethers.utils.formatBytes32String(videoId)
+
+    const usedExternalID: boolean = await this.contract.usedExternalID(videoByte);
+
+    return usedExternalID;
   }
 
   async generateProof(): Promise<ProofApiResponse & ErrorApiResponse> {
@@ -217,15 +309,27 @@ export default class RfoxKit {
     return data;
   }
 
+  async generateProofRfoxTv(): Promise<RfoxTvProofResponse & ErrorApiResponse> {
+    console.log('generate proof tv', this.walletAddress, this.assetId)
+    const { data } = await axios.get<RfoxTvProofResponse & ErrorApiResponse>(
+      `${this.apiBaseUrl}/api/rfoxtv/signedMessage/${this.walletAddress}/${this.assetId}`,
+    );
+
+    return data;
+  }
+
   async mint(quantity: number): Promise<ContractReceipt | null> {
     try {
       // safety check
-      quantity = Number(Math.min(quantity, await this.maxPerMint()));
+      console.log('quantity check')
+      quantity = this.contractType === 'rfoxtv' ? 1 : Number(Math.min(quantity, await this.maxPerMint()));
 
-      const saleActive = await this.saleActive();
-      const publicActive = await this.publicActive();
+      console.log('sale check')
+      const saleActive = this.contractType === 'rfoxtv' ? true : await this.saleActive();
+      const publicActive = this.contractType === 'rfoxtv' ? true : await this.publicActive();
 
-      const maxPerWallet =
+      console.log('max per wallet check')
+      const maxPerWallet = this.contractType === 'rfoxtv' ? 1 :
         saleActive && !publicActive
           ? await this.maxPerMintPresale()
           : await this.maxPerMint();
@@ -240,12 +344,17 @@ export default class RfoxKit {
         throw new Error("Collection is not on sale");
       }
 
-      const price =
+      const price = this.contractType === 'rfoxtv' ? await this.priceRfoxTv() :
         saleActive && !publicActive
           ? await this.pricePreSale()
           : await this.price();
 
       const amount = price.mul(quantity);
+
+      if(this.contractType === 'rfoxtv') {
+        console.log('mint thru rfox tv contract')
+        return await this._mintRfoxTv(quantity, amount)
+      }
 
       // Presale minting
       if (saleActive && !publicActive) {
@@ -277,6 +386,58 @@ export default class RfoxKit {
     return trx.wait();
   }
 
+  private async _mintRfoxTv(
+    quantity: number,
+    amount: BigNumber
+  ): Promise<ContractReceipt> {
+
+    const data = await this.generateProofRfoxTv();
+    if (data.message) {
+      if (this.contractType === "standard") {
+        throw new Error("This is not supported contract type");
+      }
+      throw new Error("There is a problem while signing your video for minting");
+    }
+
+    console.log('proof', data);
+
+    console.log('contract param', {wallet: this.walletAddress,
+      quantity,
+      externalId: data.externalId,
+      salt: data.salt,
+      signature: data.signature,
+      value: amount})
+
+    const trx: ContractTransaction = await this.contract.safeMint(
+      this.walletAddress,
+      quantity,
+      [data.externalId],
+      data.salt,
+      data.signature,
+      {
+        value: amount,
+      }
+    );
+    // .then((response: TransactionResponse) => {
+    //   console.log('response tx', response)
+    //   return response.hash
+    // });
+
+    // console.log('trx', trx)
+
+
+    // if(trx) {
+    //   return trx
+    // }
+
+    // else {
+    //   throw new Error("There is a problem while minting your asset");
+    // }
+
+    return trx.wait()
+
+  }
+
   private async _presaleMint(
     quantity: number,
     amount: BigNumber
@@ -290,13 +451,8 @@ export default class RfoxKit {
       throw new Error("Your wallet is not part of presale.");
     }
 
-    // ContractTransaction = await this.contract.this[functionName](
-    //   quantity,
-    //   data.proof,
-    //   {
-    //     value: amount,
-    //   }
-    // );
+    //TODO: Explore dynamic function name here later
+    //Example: this.contract.this[functionName]()
 
     const trx: ContractTransaction = await this.contract.buyNFTsPresale(
       quantity,

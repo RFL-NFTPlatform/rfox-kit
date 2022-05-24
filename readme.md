@@ -13,19 +13,19 @@ npm install @rfl-nftplatform/rfox-kit
 2. Import via CDN
 
 ```html
-<script src="https://unpkg.com/rfl-nftplatform/rfox-kit/dist/umd/index.js"></script>
+<script src="https://unpkg.com/@rfoxlabs/rfox-kit/dist/umd/index.js"></script>
 ```
 
 ## Example
 
 ```html
 <!-- Import DropKit.js library -->
-<script src="https://unpkg.com/rfl-nftplatform/rfox-kit/dist/umd/index.js"></script>
+<script src="https://unpkg.com/@rfoxlabs/rfox-kit/dist/umd/index.js"></script>
 
 <script>
   document.getElementById('mint_btn').onclick = async function mint() {
-    const drop = await DropKit.create('sdk-api-key-here'); // Supply API key
-    await drop.mint(1); // Number of NFTs to mint
+    const kit = await RfoxKit.create(collectionAddress, collectionId, contractType, networkName, chainId, maxSupply, providers); // Supply Collection Details here
+    await kit.mint(1); // Number of NFTs to mint
   }
 </script>
 ```
