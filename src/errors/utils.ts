@@ -16,12 +16,36 @@ export function handleError(e: EthereumRpcError<unknown>): void {
 
   // ideally we would check for the error code here, but the same error code: -32000 (Bad Input)
   // is used for more than one error type
-  if (msg.includes("err: insufficient funds for gas * price + value")) {
+  if (msg.toLowerCase().includes("err: insufficient funds for gas * price + value")) {
     throw new Error("Your wallet does not have enough balance.");
   }
 
+  if (msg.toLowerCase().includes("unauthorized to join the presale")) {
+    throw new Error("You are not in the whitelist.");
+  }//Not Authorize for presale
+
+  if (msg.toLowerCase().includes("exceed the limit")) {
+    throw new Error("You reach max minted NFTs per address.");
+  }//Have minted presale spot
+
+
+  if (msg.toLowerCase().includes("sale has not been started")) {
+    throw new Error("Sale has not been started.");
+  }//
+
   if ((e.code as unknown as string) === "CALL_EXCEPTION") {
     throw new Error("Please make sure you are connected to the right network.");
+  }
+
+  if(msg === 'Something went wrong.') {
+    console.log('Something went wrong')
+    return;
+  }
+
+  //wallet cancel error
+  if(msg.toLowerCase() === 'user rejected' || msg.toLowerCase() === 'user closed modal' || msg.toLowerCase() === 'user denied account authorization' || msg.toLowerCase() === 'accounts received is empty') {
+    console.log('User doesnt want to connect')
+    return;
   }
 
   throw Error(msg);
