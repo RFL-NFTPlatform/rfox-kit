@@ -1,4 +1,19 @@
 [
+  { "inputs": [], "name": "ApprovalCallerNotOwnerNorApproved", "type": "error" },
+  { "inputs": [], "name": "ApprovalQueryForNonexistentToken", "type": "error" },
+  { "inputs": [], "name": "ApprovalToCurrentOwner", "type": "error" },
+  { "inputs": [], "name": "ApproveToCaller", "type": "error" },
+  { "inputs": [], "name": "BalanceQueryForZeroAddress", "type": "error" },
+  { "inputs": [], "name": "MintToZeroAddress", "type": "error" },
+  { "inputs": [], "name": "MintZeroQuantity", "type": "error" },
+  { "inputs": [], "name": "OwnerIndexOutOfBounds", "type": "error" },
+  { "inputs": [], "name": "OwnerQueryForNonexistentToken", "type": "error" },
+  { "inputs": [], "name": "TokenIndexOutOfBounds", "type": "error" },
+  { "inputs": [], "name": "TransferCallerNotOwnerNorApproved", "type": "error" },
+  { "inputs": [], "name": "TransferFromIncorrectOwner", "type": "error" },
+  { "inputs": [], "name": "TransferToNonERC721ReceiverImplementer", "type": "error" },
+  { "inputs": [], "name": "TransferToZeroAddress", "type": "error" },
+  { "inputs": [], "name": "URIQueryForNonexistentToken", "type": "error" },
   {
     "anonymous": false,
     "inputs": [{ "indexed": true, "internalType": "address", "name": "sender", "type": "address" }],
@@ -23,16 +38,6 @@
       { "indexed": false, "internalType": "bool", "name": "approved", "type": "bool" }
     ],
     "name": "ApprovalForAll",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": true, "internalType": "address", "name": "sender", "type": "address" },
-      { "indexed": false, "internalType": "address", "name": "oldAddress", "type": "address" },
-      { "indexed": false, "internalType": "address", "name": "newAddress", "type": "address" }
-    ],
-    "name": "AuthorizedSignerAddress",
     "type": "event"
   },
   {
@@ -175,13 +180,6 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "authorizedSignerAddress",
-    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [{ "internalType": "address", "name": "owner", "type": "address" }],
     "name": "balanceOf",
     "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
@@ -198,9 +196,7 @@
   {
     "inputs": [
       { "internalType": "uint256", "name": "tokensNumber", "type": "uint256" },
-      { "internalType": "bytes32[]", "name": "proof", "type": "bytes32[]" },
-      { "internalType": "uint256", "name": "salt", "type": "uint256" },
-      { "internalType": "bytes", "name": "signature", "type": "bytes" }
+      { "internalType": "bytes32[]", "name": "proof", "type": "bytes32[]" }
     ],
     "name": "buyNFTsPresale",
     "outputs": [],
@@ -208,21 +204,10 @@
     "type": "function"
   },
   {
-    "inputs": [
-      { "internalType": "uint256", "name": "tokensNumber", "type": "uint256" },
-      { "internalType": "uint256", "name": "salt", "type": "uint256" },
-      { "internalType": "bytes", "name": "signature", "type": "bytes" }
-    ],
+    "inputs": [{ "internalType": "uint256", "name": "tokensNumber", "type": "uint256" }],
     "name": "buyNFTsPublic",
     "outputs": [],
     "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "inputs": [{ "internalType": "address", "name": "signerAddress", "type": "address" }],
-    "name": "changeAuthorizedSignerAddress",
-    "outputs": [],
-    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

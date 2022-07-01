@@ -60,6 +60,9 @@ export default class RfoxKit {
   preSalePrice: BigNumber;
   isPublicActive: boolean;
   isSaleActive: boolean;
+  saleStartTime:number;
+  saleEndTime:number;
+  publicSaleStartTime: number;
   provider: Web3Provider | JsonRpcProvider = {} as Web3Provider;
   signer: JsonRpcSigner = {} as JsonRpcSigner;
   ethInstance: any;
@@ -84,6 +87,9 @@ export default class RfoxKit {
     this.salePrice = BigNumber.from(0);
     this.preSalePrice = BigNumber.from(0);
     this.whitelistUrl = "";
+    this.saleStartTime = 0;
+    this.saleEndTime = 0;
+    this.publicSaleStartTime = 0;
   }
 
   async init(
@@ -260,17 +266,38 @@ export default class RfoxKit {
   async saleActive(): Promise<boolean> {
     const currentTime = Math.round(Date.now() / 1000);
 
-    return Number(await this.contract.saleStartTime()) < currentTime;
+    const saleStartTime = Number(await this.contract.saleStartTime())
+
+    console.log('saleStartTime', saleStartTime, currentTime)
+
+    return saleStartTime < currentTime;
+  }
+
+  async getSaleStartTime(): Promise<number> {
+    return Number(await this.contract.saleStartTime());
+  }
+
+  async getSaleEndTime(): Promise<number> {
+    return Number(await this.contract.saleEndTime());
+  }
+
+  async getPublicSaleStartTime(): Promise<number> {
+    return Number(await this.contract.publicSaleStartTime());
   }
 
   async publicActive(): Promise<boolean> {
     const currentTime = Math.round(Date.now() / 1000);
+
+    console.log('checking public active' , this.contractType)
     if (this.contractType === "standard_721") {
       return true;
     }
-    return (
-      Number(await this.contract.publicSaleStartTime()) < currentTime
-    );
+
+    const publicSaleTime =  Number(await this.contract.publicSaleStartTime())
+
+    console.log('publicSaleTime', publicSaleTime, currentTime)
+
+    return publicSaleTime < currentTime;
   }
 
 
@@ -292,10 +319,15 @@ export default class RfoxKit {
 
       this.salePrice = await this.price();
 
+      this.saleStartTime = await this.getSaleStartTime();
+      this.saleEndTime = await this.getSaleEndTime();
+
       if(contractType !== 'standard_721') {
         this.maxPerTxWL = await this.maxPerMintPresale();
         this.isPublicActive = await this.publicActive();
         this.preSalePrice = await this.pricePreSale();
+        this.publicSaleStartTime = await this.getPublicSaleStartTime();
+
       }
 
     }
@@ -344,15 +376,21 @@ export default class RfoxKit {
 
       this.salePrice = tokenInfo.tokenPrice;
 
+      this.saleStartTime = tokenInfo.saleStartTime;
+      this.saleEndTime = tokenInfo.saleEndTime;
+
       if(contractType === 'whitelist_1155') {
 
         const whitelistInfo = await this.erc1155TokenPresaleInfo(assetId);
 
-        console.log('public check', Number(whitelistInfo.publicSaleStartTime),  currentTime, (Number(whitelistInfo.publicSaleStartTime) > currentTime))
+        console.log('public check', Number(whitelistInfo.publicSaleStartTime),  currentTime, (Number(whitelistInfo.publicSaleStartTime) > currentTime));
 
-        this.maxPerTxWL = whitelistInfo.maxMintedPresalePerAddress
-        this.isPublicActive = Number(whitelistInfo.publicSaleStartTime) < currentTime
-        this.preSalePrice = whitelistInfo.tokenPricePresale
+        this.maxPerTxWL = whitelistInfo.maxMintedPresalePerAddress;
+        this.isPublicActive = Number(whitelistInfo.publicSaleStartTime) < currentTime;
+        this.preSalePrice = whitelistInfo.tokenPricePresale;
+
+        this.publicSaleStartTime = whitelistInfo.publicSaleStartTime;
+
       }
 
     }
@@ -427,6 +465,9 @@ export default class RfoxKit {
         const saleActive = this.contractType === 'rfoxtv' ? true : await this.saleActive();
         const publicActive = this.contractType === 'rfoxtv' ? true : await this.publicActive();
 
+        console.log('sale active', saleActive);
+        console.log('public active', publicActive);
+
         console.log('max per wallet check')
         const maxPerWallet = this.contractType === 'rfoxtv' ? 1 :
           saleActive && !publicActive
@@ -460,7 +501,7 @@ export default class RfoxKit {
           // Backwards compatibility with v2 contracts:
           // If the public sale is not active, we can still try mint with the presale
 
-          return await this._presaleMint(quantity, amount);
+          return await this._presaleMint(quantity, amount, this.whitelistUrl);
         }
 
         // Regular minting
@@ -588,15 +629,19 @@ export default class RfoxKit {
 
   private async _presaleMint(
     quantity: number,
-    amount: BigNumber
+    amount: BigNumber,
+    whitelistUrl: string
   ): Promise<ContractReceipt> {
-    const data = await this.generateProof();
-    if (data.message) {
-      // Backwards compatibility for v2 contracts
-      if (this.contractType === "standard_721") {
-        throw new Error("Collection does not support preSale");
-      }
-      throw new Error("Your wallet is not part of presale.");
+    // const data = await this.generateProof();
+
+
+    console.log('getting proof')
+    const proof = await this.generateProofLocally(whitelistUrl);
+
+    console.log('proof', proof)
+
+    if(!proof?.length) {
+      throw new Error("You are not in the whitelist.");
     }
 
     //TODO: Explore dynamic function name here later
@@ -604,7 +649,7 @@ export default class RfoxKit {
 
     const trx: ContractTransaction = await this.contract.buyNFTsPresale(
       quantity,
-      data.proof,
+      proof,
       {
         value: amount,
       }
@@ -640,6 +685,10 @@ export default class RfoxKit {
     const proof = await this.generateProofLocally(whitelistUrl);
 
     console.log('proof', proof)
+
+    if(!proof?.length) {
+      throw new Error("You are not in the whitelist.");
+    }
 
 
     const trx: ContractTransaction = await this.contract.buyNFTsPresale(
